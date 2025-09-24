@@ -1,0 +1,53 @@
+{
+  "appTitle": "Sequelize CLI",
+  "docsLink": "CLI Docs",
+  "envLabel": "Env",
+  "productionWarning": "PRODUCTION environment: actions can irreversibly modify data.",
+  "footerStatusTemplate": "PM: {pm} - Env: {env}",
+
+  "sectionMigrations": "Migrations",
+  "sectionSeeds": "Seeds",
+  "tipMigrations": "Right-click a /migrations file for 'Migrate to...' / 'Undo...'",
+  "tipSeeds": "• Right-click a /seeders file for 'Run' / 'Undo'",
+
+  "btnMigrate": "Migrate",
+  "btnUndoLast": "Undo Last",
+  "btnStatus": "Status",
+  "btnGenerate": "Generate",
+  "btnRunAllSeeds": "Run All",
+  "btnUndoAllSeeds": "Undo All",
+
+  "askMigrationName": "Migration name (kebab-case)",
+  "askSeedName": "Seed name (kebab-case)",
+
+  "notifMigrationsStarted": "Migrations started",
+  "notifUndoLastDone": "Last migration undo started",
+  "notifStatusRequested": "Migrations status requested",
+  "notifMigrationCreated": "Migration “{name}” created (command sent)",
+  "notifRunAllSeeds": "All seeds execution started",
+  "notifUndoAllSeeds": "All seeds undo started",
+  "notifSeedCreated": "Seed “{name}” created (command sent)",
+  "notifProductionWarning": "Caution: running in PRODUCTION environment",
+
+  "ctxGroupSequelize": "Sequelize",
+  "ctxGroupMigration": "Migration",
+  "ctxGroupSeed": "Seed",
+  "ctxRunThisMigration": "Run this migration (to)",
+  "ctxUndoThisMigration": "Undo this migration",
+  "ctxUndoToThisMigration": "Undo to this migration…",
+  "ctxGenerateMigration": "Generate migration…",
+  "ctxRunThisSeed": "Run this seed",
+  "ctxUndoThisSeed": "Undo this seed",
+
+  "confirmUndoToTitle": "Sequelize - Undo to…",
+  "confirmUndoToBody": "Undo ALL migrations down to:\n{file}\n\nEnvironment: {env}",
+  "confirmMigrateToTitle": "Sequelize - Migrate to…",
+  "confirmMigrateToBody": "Apply all migrations up to:\n{file}\n\nEnvironment: {env}",
+
+  "notifUndoToDone": "Migrations undone down to “{file}” (command sent)",
+  "notifMigrateToDone": "Migrations applied up to “{file}” (command sent)",
+  "notifSeedRun": "Seed “{file}” executed (command sent)",
+  "notifSeedUndo": "Seed “{file}” undone (command sent)",
+  "notifMigrationUndo": "Migration “{file}” undone (command sent)",
+  "notifMigrationCreatedShort": "Migration created!"
+}

@@ -1,0 +1,95 @@
+<idea-plugin>
+    <id>me.raphaelsfeir.webstorm-sequelize</id>
+    <name>Sequelize Runner</name>
+    <version>1.0.0</version>
+    <vendor email="contact@raphaelsfeir.me" url="https://raphaelsfeir.me">Raphaël Sfeir</vendor>
+    <description>
+        <![CDATA[
+            <p><b>Sequelize Runner</b> is a plugin for WebStorm / IntelliJ IDEA that simplifies
+            working with the <a href="https://sequelize.org/">Sequelize CLI</a>.</p>
+            <ul>
+                <li>Run or undo migrations directly from the context menu</li>
+                <li>Quickly generate new migrations</li>
+                <li>Execute or undo seed files</li>
+                <li>Supports multiple environments (development, test, production)</li>
+            </ul>
+        ]]>
+    </description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Sequelize"
+                    factoryClass="ui.SequelizeToolWindowFactory"
+                    anchor="right"
+                    stripeTitle="Sequelize"
+                    icon="icon/icon.svg"/>
+
+        <!-- Notification group used by Notif.kt -->
+        <notificationGroup id="Sequelize"
+                           displayType="BALLOON"
+                           isLogByDefault="true"/>
+
+        <!-- Persisted project service for environment -->
+        <projectService serviceImplementation="core.EnvManager"/>
+    </extensions>
+
+    <actions>
+        <!-- Context root group "Sequelize" with subgroups -->
+        <group id="Sequelize.ContextGroup"
+               popup="true"
+               text="Sequelize"
+               icon="icon/icon.svg">
+            <!-- Show this group in the Project View context menu -->
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="NewElement"/>
+
+            <!-- Subgroup: Migration -->
+            <group id="Sequelize.ContextGroup.Migrations"
+                   popup="true"
+                   text="Migration"
+                   icon="icon/icon.svg">
+                <action id="Sequelize.MigrateTo"
+                        class="actions.MigrateToMigrationContextAction"
+                        text="Run this migration (to)"
+                        description="Apply all migrations up to this file"/>
+                <action id="Sequelize.UndoMigration"
+                        class="actions.UndoMigrationContextAction"
+                        text="Undo this migration"
+                        description="Undo only this migration"/>
+                <action id="Sequelize.UndoToMigration"
+                        class="actions.UndoToMigrationContextAction"
+                        text="Undo to this migration…"
+                        description="Undo all migrations down to this file"/>
+                <action id="Sequelize.GenerateMigration"
+                        class="actions.GenerateMigrationContextAction"
+                        text="Generate migration…"
+                        description="Generate a new migration by name"/>
+            </group>
+
+            <!-- Subgroup: Seed -->
+            <group id="Sequelize.ContextGroup.Seeds"
+                   popup="true"
+                   text="Seed"
+                   icon="icon/icon.svg">
+                <action id="Sequelize.RunSeed"
+                        class="actions.RunSeedContextAction"
+                        text="Run this seed"
+                        description="Execute this seed"/>
+                <action id="Sequelize.UndoSeed"
+                        class="actions.UndoSeedContextAction"
+                        text="Undo this seed"
+                        description="Undo this seed"/>
+            </group>
+        </group>
+
+        <!-- Also expose "Create migration" in Tools menu -->
+        <action id="Sequelize.CreateMigration"
+                class="actions.CreateMigrationAction"
+                text="Sequelize: Create migration…"
+                description="Generate a new Sequelize migration">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
