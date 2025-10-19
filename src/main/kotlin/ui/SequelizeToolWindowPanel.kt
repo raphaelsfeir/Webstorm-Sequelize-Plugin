@@ -1,3 +1,56 @@
+/**
+ * SequelizeToolWindowPanel.kt
+ * ----------------------------
+ * Defines the main UI panel displayed inside the **Sequelize** tool window.
+ *
+ * This panel provides quick-access buttons for common Sequelize CLI operations
+ * such as running migrations, generating seeds, or undoing database changes —
+ * all integrated with the IDE’s terminal and notification systems.
+ *
+ * The panel is split into two main sections:
+ *  1. **Migrations** — Run, undo, or generate migration scripts.
+ *  2. **Seeds** — Run, undo, or generate seed files.
+ *
+ * Key Features:
+ *  - Executes commands via the shared “Sequelize Runner” terminal tab.
+ *  - Automatically detects the project’s package manager (npm, yarn, pnpm).
+ *  - Allows switching environments (“development”, “test”, “production”).
+ *  - Displays warnings and notifications when running in production.
+ *
+ * Example layout:
+ * ```
+ * [ Sequelize ⚙  | Environment: [development ▼] | Docs link ]
+ * ------------------------------------------------------------
+ * |  Migrations  |   Run Migration   |   Undo Last   |   Status   |   Generate   |
+ * |  Seeds       |   Run All         |   Undo All    |   Generate  |
+ * ------------------------------------------------------------
+ *   PM: NPM • Env: development
+ * ```
+ *
+ * Dependencies:
+ *  - [EnvManager]: Manages and persists the current Sequelize environment.
+ *  - [PackageManagerDetector]: Detects the Node.js package manager.
+ *  - [TerminalRunner]: Executes commands in the IDE terminal.
+ *  - [Notif]: Displays success and warning notifications.
+ *  - [Labels]: Provides localized UI text.
+ *
+ * Registered via [SequelizeToolWindowFactory] in `plugin.xml`.
+ *
+ * @see core.TerminalRunner
+ * @see core.PackageManagerDetector
+ * @see core.EnvManager
+ * @see ui.SequelizeToolWindowFactory
+ *
+ * @author
+ *   Raphaël Sfeir (github.com/raphaelsfeir)
+ *
+ * @since
+ *   1.0.0 — Initial implementation of the main Sequelize tool window panel.
+ *
+ * @license
+ *   MIT License
+ */
+
 package ui
 
 import com.intellij.icons.AllIcons
@@ -16,23 +69,18 @@ import core.PackageManager
 import core.PackageManagerDetector
 import core.TerminalRunner
 import i18n.Labels
-import java.awt.BorderLayout
-import java.awt.FlowLayout
-import java.awt.Font
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
+import java.awt.*
 import javax.swing.*
 
 /**
- * ToolWindow panel for Sequelize quick actions.
- * - Two sections: Migrations & Seeds
- * - Uses integrated terminal for commands
- * - Success notifications when a command is sent
- * - Production environment warning below the title
+ * The main UI panel of the **Sequelize** tool window.
+ *
+ * Provides buttons and quick actions for migrations and seeds management,
+ * along with environment controls and live status information.
  */
 class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
 
-    // --- Services / state ---
+    // --- Services and runtime state ---
     private val envManager = project.getService(EnvManager::class.java)
     private val rootVf = LocalFileSystem.getInstance().findFileByPath(project.basePath ?: ".")
     private val pm: PackageManager = PackageManagerDetector.detect(rootVf)
@@ -51,24 +99,9 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
     init {
         border = JBUI.Borders.empty(10)
 
-        // Header
+        // Build layout: header, content, footer
         val header = buildHeader()
-
-        // Content
-        val content = JPanel(GridBagLayout()).apply {
-            val c = GridBagConstraints().apply {
-                gridx = 0
-                weightx = 1.0
-                fill = GridBagConstraints.HORIZONTAL
-                anchor = GridBagConstraints.NORTHWEST
-                insets = JBUI.insets(0, 0, 10, 0)
-            }
-            c.gridy = 0; add(buildMigrationsSection(), c)
-            c.gridy = 1; add(buildSeedsSection(), c)
-            c.gridy = 2; c.weighty = 1.0; add(Box.createVerticalGlue(), c)
-        }
-
-        // Footer
+        val content = buildContent()
         footer.text = footerText()
         footer.border = JBUI.Borders.emptyTop(6)
         footer.foreground = UIManager.getColor("Label.disabledForeground")
@@ -79,7 +112,12 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
         add(footer, BorderLayout.SOUTH)
     }
 
-    // Header
+    /**
+     * Builds the top header section with:
+     *  - Title and icon
+     *  - Environment dropdown selector
+     *  - Link to Sequelize documentation/help
+     */
     private fun buildHeader(): JPanel {
         val title = JBLabel(Labels.t("appTitle"), AllIcons.General.Settings, SwingConstants.LEADING).apply {
             font = JBFont.label().asBold().deriveFont(15f)
@@ -103,7 +141,6 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
             add(JBLabel(Labels.t("envLabel")))
             add(envBox)
             add(ActionLink(Labels.t("docsLink")) {
-                // Open terminal with CLI help for quick reference
                 TerminalRunner.runInTerminal(project, "npx sequelize-cli help")
             })
         }
@@ -120,11 +157,30 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
         }
     }
 
-    // Sections (cards)
-    private fun buildMigrationsSection(): JComponent {
-        val wrapper = JPanel(BorderLayout()).apply {
-            border = JBUI.Borders.customLine(UIManager.getColor("Separator.foreground"), 1)
+    /**
+     * Builds the scrollable content area with two sections:
+     * Migrations and Seeds.
+     */
+    private fun buildContent(): JComponent {
+        return JPanel(GridBagLayout()).apply {
+            val c = GridBagConstraints().apply {
+                gridx = 0
+                weightx = 1.0
+                fill = GridBagConstraints.HORIZONTAL
+                anchor = GridBagConstraints.NORTHWEST
+                insets = JBUI.insets(0, 0, 10, 0)
+            }
+            c.gridy = 0; add(buildMigrationsSection(), c)
+            c.gridy = 1; add(buildSeedsSection(), c)
+            c.gridy = 2; c.weighty = 1.0; add(Box.createVerticalGlue(), c)
         }
+    }
+
+    /**
+     * Builds the "Migrations" section with action buttons.
+     */
+    private fun buildMigrationsSection(): JComponent {
+        val wrapper = borderedPanel()
         val inner = JPanel(BorderLayout()).apply { border = JBUI.Borders.empty(10) }
 
         inner.add(TitledSeparator(Labels.t("sectionMigrations")), BorderLayout.NORTH)
@@ -152,10 +208,11 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
         return wrapper
     }
 
+    /**
+     * Builds the "Seeds" section with action buttons.
+     */
     private fun buildSeedsSection(): JComponent {
-        val wrapper = JPanel(BorderLayout()).apply {
-            border = JBUI.Borders.customLine(UIManager.getColor("Separator.foreground"), 1)
-        }
+        val wrapper = borderedPanel()
         val inner = JPanel(BorderLayout()).apply { border = JBUI.Borders.empty(10) }
 
         inner.add(TitledSeparator(Labels.t("sectionSeeds")), BorderLayout.NORTH)
@@ -180,7 +237,13 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
         return wrapper
     }
 
-    // Helpers
+    /** Builds a thin bordered container for section grouping. */
+    private fun borderedPanel(): JPanel =
+        JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.customLine(UIManager.getColor("Separator.foreground"), 1)
+        }
+
+    /** Creates an action toolbar for a list of buttons. */
     private fun makeToolbar(actions: List<AnAction>): JComponent {
         val group = DefaultActionGroup().apply { actions.forEach { add(it) } }
         return ActionManager.getInstance()
@@ -191,13 +254,14 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
             }.component
     }
 
-    /** update on BGT. */
-    private fun action(text: String, icon: javax.swing.Icon, onClick: () -> Unit): AnAction =
+    /** Creates a simple text-based button for toolbar actions. */
+    private fun action(text: String, icon: Icon, onClick: () -> Unit): AnAction =
         object : AnAction(text, null, icon), DumbAware {
             override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) = onClick()
         }
 
+    /** Builds a small gray informational text label below sections. */
     private fun tips(text: String): JComponent =
         JBLabel(text).apply {
             border = JBUI.Borders.emptyTop(8)
@@ -205,16 +269,21 @@ class SequelizeToolWindowPanel(private val project: Project) : JPanel(BorderLayo
             font = font.deriveFont(Font.PLAIN, 11f)
         }
 
+    /** Prompts the user for input with a small dialog box. */
     private fun ask(title: String): String? =
         com.intellij.openapi.ui.Messages.showInputDialog(project, title, "Sequelize", null)?.trim()
 
-    /** Join command via PackageManagerDetector and show success notification. */
+    /**
+     * Joins and runs the Sequelize CLI command based on the detected package manager,
+     * then displays a success notification.
+     */
     private fun runAndNotify(args: List<String>, successMsg: String) {
         val cmd = PackageManagerDetector.command(pm, args)
         TerminalRunner.runInTerminal(project, cmd)
         Notif.success(project, successMsg)
     }
 
+    /** Builds the footer text showing current environment and package manager. */
     private fun footerText(): String =
         Labels.t("footerStatusTemplate", "pm" to pm.name, "env" to currentEnv)
 }

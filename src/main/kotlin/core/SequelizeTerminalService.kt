@@ -5,20 +5,24 @@
  *
  * This service manages a single shared terminal tab called **"Sequelize Runner"**
  * for each IntelliJ project. All Sequelize-related CLI operations are executed
- * through this terminal to keep output centralized and consistent.
+ * through this terminal to keep output centralized, persistent, and consistent.
  *
  * Responsibilities:
- *  - Create and manage one persistent terminal widget per project.
- *  - Execute shell commands safely within the Event Dispatch Thread (EDT).
- *  - Automatically switch the working directory for monorepo compatibility.
- *  - Dispose of resources cleanly when the project is closed.
+ *  - Create and manage a single persistent terminal widget per project.
+ *  - Reuse the same terminal session for multiple Sequelize commands.
+ *  - Automatically switch to the correct working directory (monorepo-compatible).
+ *  - Dispose of resources properly when the project is closed.
  *
- * Typical usage:
- *  ```kotlin
- *  TerminalRunner.runInTerminal(project, "npx sequelize-cli db:migrate")
- *  ```
+ * Example usage:
+ * ```kotlin
+ * TerminalRunner.runInTerminal(project, "npx sequelize-cli db:migrate")
+ * ```
  *
- * This class is used internally by [TerminalRunner] and other plugin components.
+ * Internally, this class is used by [TerminalRunner] and other plugin components
+ * to abstract away terminal management details from higher-level actions.
+ *
+ * @see TerminalRunner
+ * @see org.jetbrains.plugins.terminal.TerminalToolWindowManager
  *
  * @author
  *   Raphaël Sfeir (github.com/raphaelsfeir)
@@ -47,60 +51,54 @@ private const val TAB_TITLE = "Sequelize Runner"
 
 /**
  * A project-level service that manages a single, persistent terminal session
- * dedicated to executing Sequelize commands.
+ * dedicated to executing Sequelize CLI commands.
  *
- * Key responsibilities:
- *  - Guarantees only one terminal tab exists per project.
- *  - Reuses the same terminal session for all commands.
- *  - Allows changing the working directory dynamically (useful for monorepos).
- *
- * This class abstracts away all terminal handling logic so other parts of the plugin
- * can simply call [run] to execute commands safely within the IDE terminal.
+ * This allows all plugin features (migrations, seed operations, environment management, etc.)
+ * to share the same terminal context for better UX and cleaner logs.
  */
 @Service(Service.Level.PROJECT)
 class SequelizeTerminalService(private val project: Project) : Disposable {
 
-    /** Reference to the active terminal widget, if any. */
+    /** Reference to the currently active terminal widget (if any). */
     @Volatile
     private var widget: ShellTerminalWidget? = null
 
     /**
-     * Executes the given shell command inside the shared “Sequelize Runner” terminal tab.
+     * Executes a shell command inside the shared “Sequelize Runner” terminal tab.
      *
      * If the terminal does not exist yet, it is created automatically.
-     * The working directory defaults to the project root unless otherwise specified.
+     * The working directory defaults to the project root unless specified otherwise.
      *
-     * @param command The shell command to run (for example, `"npx sequelize-cli db:migrate"`).
-     * @param workingDir Optional working directory. Defaults to the project base path.
+     * @param command The shell command to execute (e.g., `"npx sequelize-cli db:migrate"`).
+     * @param workingDir Optional working directory. Defaults to the project’s base path.
      */
     fun run(command: String, workingDir: String? = null) {
         val wd = workingDir ?: (project.basePath ?: ".")
         val shell = ensureWidget(wd)
 
-        // Always switch to the correct directory before executing the command.
-        // This is important for monorepo projects where context changes frequently.
+        // Always switch to the correct directory before executing commands.
+        // This is particularly important for multi-package (monorepo) projects.
         shell.executeCommand("cd ${quotePath(wd)}")
         shell.executeCommand(command)
     }
 
     /**
-     * Ensures that the Sequelize terminal widget exists and is usable.
-     * If it has not been created yet or has been disposed, a new one is created.
+     * Ensures that the Sequelize terminal widget exists and is valid.
+     * If it has not been created yet or was previously disposed, a new one is created.
      *
-     * @param initialWorkingDir The initial working directory to create the terminal in.
+     * @param initialWorkingDir The directory to initialize the shell in.
      * @return A valid [ShellTerminalWidget] instance ready for command execution.
      */
     private fun ensureWidget(initialWorkingDir: String): ShellTerminalWidget {
         val existing = widget
 
-        // Verify that the current widget is still alive and usable.
+        // Check that the existing terminal is still alive and usable.
         @Suppress("DEPRECATION")
         if (existing != null && !Disposer.isDisposed(existing)) {
             return existing
         }
 
-        // Create a new local shell widget using the modern API.
-        // (TerminalView is deprecated and should not be used anymore.)
+        // Create a new local shell widget using the modern API (TerminalToolWindowManager).
         val manager = TerminalToolWindowManager.getInstance(project)
         val shell: ShellTerminalWidget = manager.createLocalShellWidget(initialWorkingDir, TAB_TITLE)
 
@@ -109,11 +107,10 @@ class SequelizeTerminalService(private val project: Project) : Disposable {
     }
 
     /**
-     * Wraps the given path in quotes so it can safely handle spaces or
-     * special characters when passed to a shell command.
+     * Quotes the given path for shell safety (spaces and special characters).
      *
      * @param path The raw file system path.
-     * @return A shell-safe quoted path.
+     * @return A shell-safe, properly quoted path string.
      */
     private fun quotePath(path: String): String {
         val p: Path = Paths.get(path)
@@ -121,14 +118,14 @@ class SequelizeTerminalService(private val project: Project) : Disposable {
     }
 
     /**
-     * Disposes of the terminal widget when the service is unloaded or the project closes.
-     * Prevents any lingering shell processes from staying alive after disposal.
+     * Disposes of the terminal widget when the project is closed or the service is unloaded.
+     * Ensures that no terminal processes remain active after disposal.
      */
     override fun dispose() {
         try {
             widget?.let { Disposer.dispose(it) }
         } catch (_: Throwable) {
-            // Suppress any disposal exceptions to avoid noisy logs.
+            // Suppress disposal exceptions to avoid cluttering logs.
         } finally {
             widget = null
         }
@@ -136,10 +133,10 @@ class SequelizeTerminalService(private val project: Project) : Disposable {
 
     companion object {
         /**
-         * Returns the [SequelizeTerminalService] instance for the given project.
+         * Retrieves the singleton [SequelizeTerminalService] instance for the given project.
          *
-         * @param project The current IntelliJ project.
-         * @return The singleton service instance for that project.
+         * @param project The current IntelliJ project context.
+         * @return The service instance associated with this project.
          */
         fun getInstance(project: Project): SequelizeTerminalService = project.service()
     }
