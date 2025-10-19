@@ -3,7 +3,7 @@
   "docsLink": "CLI Docs",
   "envLabel": "Env",
   "productionWarning": "PRODUCTION environment: actions can irreversibly modify data.",
-  "footerStatusTemplate": "PM: {pm} - Env: {env}",
+  "footerStatusTemplate": "PM: {pm} • Env: {env}",
 
   "sectionMigrations": "Migrations",
   "sectionSeeds": "Seeds",
