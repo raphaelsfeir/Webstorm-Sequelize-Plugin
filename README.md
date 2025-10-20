@@ -22,7 +22,7 @@ Because typing `npx sequelize-cli db:migrate` 50 times a day is not what we sign
 ## 🧑‍💻 Installation
 
 ### 😅 I'm not a geek!
-No worries! Just [download the latest release](https://github.com/raphaelsfeir/Webstorm-Sequelize-Plugin/releases/latest/download/webstorm-sequelize-plugin-1.0.0.zip) — that's literally all you need to do.
+No worries! Just [download the latest release](https://github.com/raphaelsfeir/Webstorm-Sequelize-Plugin/releases/latest/download/webstorm-sequelize-plugin-1.1.0.zip) — that's literally all you need to do.
 
 ---
 
@@ -80,7 +80,7 @@ To package your own `.zip`:
 ```
 
 The `.zip` will appear in `build/distributions/`.
-Give it a cool name like `sequelize-runner-1.0.0.zip` and share it with the world 🌍
+Give it a cool name like `sequelize-runner-1.1.0.zip` and share it with the world 🌍
 
 ---
 
