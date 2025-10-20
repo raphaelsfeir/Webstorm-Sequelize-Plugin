@@ -6,27 +6,27 @@
  *
  * When a user right-clicks within the `migrations` folder and triggers this action:
  *  1. They are prompted for a migration name via an input dialog.
- *  2. The plugin detects the project's package manager (npm, yarn, or pnpm).
- *  3. The current environment is fetched from [EnvManager].
- *  4. The appropriate `sequelize-cli migration:generate` command is executed
- *     inside the shared terminal tab managed by [TerminalRunner].
+ *  2. The plugin detects the project's module type (ESM or CommonJS).
+ *  3. The migration file is generated natively using [MigrationScaffolder]
+ *     with the appropriate syntax and file extension.
+ *  4. The file is saved under `migrations/<timestamp>-<name>.<ext>`.
  *  5. A localized success notification is shown through [Notif].
  *
- * This action improves developer workflow by allowing Sequelize migrations
- * to be scaffolded contextually from the project tree, without switching to the terminal.
+ * This action improves developer workflow by scaffolding Sequelize migrations
+ * contextually from the project tree, without invoking external CLI commands.
  *
  * Example workflow:
  * ```
  * Right-click → New Migration
  * → Prompt: "Enter migration name"
- * → Executes: npx sequelize-cli migration:generate --name <name> --env development
- * → Shows: "Migration '<name>' created successfully"
+ * → Creates: migrations/20251019215320-create-users.mjs
+ * → Shows: "Migration '20251019215320-create-users.mjs' created successfully"
  * ```
  *
  * Dependencies:
- *  - [EnvManager]: Provides the active environment (e.g., "development").
- *  - [PackageManagerDetector]: Determines which package manager to use.
- *  - [TerminalRunner]: Runs Sequelize commands in the IDE terminal.
+ *  - [ModuleKindDetector]: Detects whether the project uses ESM or CommonJS.
+ *  - [MigrationScaffolder]: Generates the migration file content and name.
+ *  - [EnvManager]: (optional) Current environment, kept for future features.
  *  - [Notif]: Displays success/failure notifications.
  *  - [Labels]: Supplies localized strings for UI text.
  *
@@ -34,7 +34,7 @@
  *   Raphaël Sfeir (github.com/raphaelsfeir)
  *
  * @since
- *   1.0.0 — Initial implementation of context-aware migration generation.
+ *   1.1.0 — Switched to native ESM/CommonJS-aware migration generation.
  *
  * @license
  *   MIT License
@@ -47,11 +47,9 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import core.EnvManager
-import core.Notif
-import core.PackageManagerDetector
-import core.TerminalRunner
+import core.*
 import i18n.Labels
+import java.nio.file.Files
 
 /**
  * Context-menu action that allows the user to create a new Sequelize migration
@@ -61,16 +59,11 @@ import i18n.Labels
  */
 class GenerateMigrationContextAction : AnAction(), DumbAware {
 
-    /**
-     * Specifies that this action runs safely on a background thread.
-     */
+    /** Runs safely on a background thread. */
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     /**
-     * Determines whether the action should appear in the context menu.
-     * It is only shown when the user right-clicks a file or folder inside `/migrations`.
-     *
-     * @param e The current action event containing the selected file reference.
+     * Show the action only when the user right-clicks a file or folder inside `/migrations`.
      */
     override fun update(e: AnActionEvent) {
         val vf = e.getData(CommonDataKeys.VIRTUAL_FILE)
@@ -78,13 +71,8 @@ class GenerateMigrationContextAction : AnAction(), DumbAware {
     }
 
     /**
-     * Handles the main logic of the action:
-     *  - Prompts the user for a migration name.
-     *  - Detects the project's package manager and environment.
-     *  - Executes the Sequelize CLI command inside the IDE terminal.
-     *  - Displays a success notification.
-     *
-     * @param e The action event triggered from the IDE context menu.
+     * Prompts for a migration name, detects module kind, generates the file,
+     * and shows a success notification.
      */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -98,26 +86,34 @@ class GenerateMigrationContextAction : AnAction(), DumbAware {
         )?.trim() ?: return
         if (name.isEmpty()) return
 
+        // Detect module type (ESM or CommonJS) from project root
         val rootVf = LocalFileSystem.getInstance().findFileByPath(project.basePath ?: ".")
-        val pm = PackageManagerDetector.detect(rootVf)
-        val env = project.getService(EnvManager::class.java)?.get() ?: "development"
+        val moduleInfo = ModuleKindDetector.detect(rootVf)
+        val kind = moduleInfo.kind
+        val ext = moduleInfo.preferredExt
 
-        // Construct and execute the Sequelize CLI command
-        val cmd = PackageManagerDetector.command(
-            pm, listOf("sequelize-cli", "migration:generate", "--name", name, "--env", env)
+        // Build migration template (empty createTable example by default)
+        val content = MigrationScaffolder.renderCreateTableTemplate(
+            kind = kind,
+            table = "example_table",
+            columns = """
+                id: { type: Sequelize.UUID, defaultValue: Sequelize.literal('gen_random_uuid()'), primaryKey: true },
+                created_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+                updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
+            """.trimIndent()
         )
-        TerminalRunner.runInTerminal(project, cmd)
 
-        // Show success notification
-        Notif.success(project, Labels.t("notifMigrationCreated", "name" to name))
+        // Write file to migrations directory
+        val basePath = project.basePath ?: return
+        val path = MigrationScaffolder.timestampedFilename(basePath, ext, name)
+        Files.createDirectories(path.parent)
+        Files.writeString(path, content)
+
+        // Notify success
+        Notif.success(project, Labels.t("notifMigrationCreated", "name" to path.fileName.toString()))
     }
 
-    /**
-     * Checks whether the selected file resides within a `/migrations` directory.
-     *
-     * @receiver The [VirtualFile] to check.
-     * @return `true` if the file path includes "/migrations", otherwise `false`.
-     */
+    /** Checks whether the selected file resides within a `/migrations` directory. */
     private fun VirtualFile?.isInMigrationsDir(): Boolean {
         if (this == null) return false
         val normalizedPath = path.replace("\\", "/")
