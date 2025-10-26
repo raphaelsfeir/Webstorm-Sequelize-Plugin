@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.1.1] — 2025-10-26
+### 🚀 Highlights
+- **Verbose Sequelize Runner Terminal**  
+  Improved Sequelize Runner Terminal experience by adding logs and commands into the shell.
+
+---
+
+---
+
 ## [1.1.0] — 2025-10-20
 ### 🚀 Highlights
 - **Unified Terminal Experience**  
